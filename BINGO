@@ -1,3 +1,238 @@
 git remote add origin https://github.com/johnAT7/BINGO.git
 git branch -M main
 git push -u origin main
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>6/49 Lotto Tracker</title>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f4f4; color: #333; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 14px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+    th { background: #222; color: #fff; }
+    tr:nth-child(even) { background: #f9f9f9; }
+    .highlight { background: #ffec8b; font-weight: 700; }
+    .results { margin-top: 20px; }
+    .results h2 { margin-bottom: 10px; }
+    input[type="text"] { padding: 6px; width: 260px; }
+    button { padding: 6px 12px; margin: 5px; cursor: pointer; border-radius: 4px; border: none; }
+    .edit-btn { background: #007bff; color: white; }
+    .delete-btn { background: #dc3545; color: white; }
+    .small { font-size: 13px; }
+    .flex { display:flex; gap:10px; align-items:center; flex-wrap:wrap }
+    .note { color:#666; font-size:13px }
+    .top-row { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-row">
+      <h1>6/49 Lotto Tracker</h1>
+      <div class="note">BINGO</div>
+    </div>
+
+    <p class="note">Enter official draw results below — matches will be highlighted across all players. You can edit or delete draws. Refreshing the page keeps your draw history.</p>
+
+    <div class="results">
+      <h2>Manage Draw Results</h2>
+      <form id="addResultForm" class="flex">
+        <label class="small">Date:</label>
+        <input type="text" id="drawDate" placeholder="e.g., Nov 13, 2025" required />
+        <label class="small">Numbers:</label>
+        <input type="text" id="drawNumbers" placeholder="e.g., 5, 12, 22, 29, 34, 41" required />
+        <button type="submit">Save Result</button>
+        <button type="button" id="exportBtn">Export JSON</button>
+        <button type="button" id="importBtn">Import JSON</button>
+      </form>
+      <div id="importArea" style="margin-top:10px;display:none">
+        <textarea id="importJson" rows="4" style="width:100%" placeholder='Paste drawResults JSON here and click "Import"'></textarea>
+        <div style="text-align:right;"><button id="doImport">Import</button></div>
+      </div>
+    </div>
+
+    <table id="lottoTable">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>1</th>
+          <th>2</th>
+          <th>3</th>
+          <th>4</th>
+          <th>5</th>
+          <th>6</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="results">
+      <h2>Official 6/49 Draw Results</h2>
+      <ul id="resultsList"></ul>
+    </div>
+  </div>
+
+  <script>
+    // Full players list (from your input) — duplicates preserved
+    const players = [
+{"name":"JOEL","nums":[5,7,11,22,44,47]},
+{"name":"RAUL","nums":[4,9,11,34,38,44]},
+{"name":"ARIEL","nums":[15,16,32,34,41,42]},
+{"name":"RICHARD","nums":[3,11,18,23,33,42]},
+{"name":"WINNIE","nums":[1,4,10,13,24,28]},
+{"name":"ROMEL","nums":[6,10,12,22,26,29]},
+{"name":"ALDEN","nums":[11,12,17,27,36,41]},
+{"name":"TRIPLE 5","nums":[1,6,7,10,12,26]},
+{"name":"MARISSA","nums":[5,7,10,25,43,32]},
+{"name":"ROSELLA","nums":[9,12,18,32,41,44]},
+{"name":"ELVIE","nums":[11,12,15,16,19,26]},
+{"name":"SGT MARK","nums":[11,22,33,38,40,43]},
+{"name":"TEDDY","nums":[8,10,12,14,24,25]},
+{"name":"FAB","nums":[2,10,25,26,29,30]},
+{"name":"BAYAW","nums":[6,8,21,28,39,41]},
+{"name":"MISIS DEN","nums":[5,7,10,15,25,30]},
+{"name":"RITZ","nums":[9,25,26,36,41,47]},
+{"name":"CHRIS","nums":[1,2,3,4,5,6]},
+{"name":"RODA","nums":[10,18,21,26,37,45]},
+{"name":"MARIO MANALAD","nums":[7,16,18,30,36,47]},
+{"name":"EDLYNN","nums":[3,7,10,34,43,45]},
+{"name":"RONNIE","nums":[4,7,11,22,23,33]},
+{"name":"CESAR R.","nums":[3,5,11,13,28,31]},
+{"name":"MARIA","nums":[6,11,19,26,38,44]},
+{"name":"RAP","nums":[1,6,10,22,23,30]},
+{"name":"FRATIMA","nums":[4,14,31,38,41,49]},
+{"name":"JINGGOY","nums":[18,25,29,32,37,42]},
+{"name":"PAUL","nums":[8,15,21,24,30,36]},
+{"name":"PHEBIE","nums":[10,15,24,28,29,44]},
+{"name":"CHESTER","nums":[5,15,18,19,24,32]},
+{"name":"YANANG","nums":[3,19,25,37,42,48]},
+{"name":"JOANA","nums":[7,13,22,26,28,36]},
+{"name":"CRIS O.","nums":[7,9,15,19,24,26]},
+{"name":"JULIAN","nums":[2,6,11,13,29,30]},
+{"name":"JEFF R.","nums":[6,9,11,17,27,45]},
+{"name":"GIRLIE","nums":[16,18,41,43,45,46]},
+{"name":"MARIO MAPILE","nums":[1,8,20,24,30,34]},
+{"name":"BRENDA","nums":[9,11,16,19,36,44]},
+{"name":"BRENDA","nums":[6,8,13,14,21,29]},
+{"name":"BONG FON","nums":[10,17,25,35,45,49]},
+{"name":"AYIE","nums":[11,16,22,27,29,38]},
+{"name":"OLIVE","nums":[8,12,19,21,26,31]},
+{"name":"KING","nums":[4,9,17,18,23,25]},
+{"name":"KAT","nums":[8,13,19,24,34,42]},
+{"name":"AMOR","nums":[8,15,22,25,43,49]},
+{"name":"MARCHE","nums":[8,13,16,28,32,44]},
+{"name":"MARK RICHARD","nums":[1,7,17,21,27,43]},
+{"name":"PHEB","nums":[7,18,21,24,33,47]},
+{"name":"MARK","nums":[8,10,15,25,35,48]},
+{"name":"ISON","nums":[2,7,14,22,27,30]},
+{"name":"VINOTHA","nums":[7,9,11,25,37,43]},
+{"name":"HANS","nums":[4,9,11,17,24,30]},
+{"name":"DEN","nums":[3,5,6,10,15,23]},
+{"name":"SARGE 1","nums":[2,10,14,17,26,38]},
+{"name":"SARGE 2","nums":[9,23,25,38,39,45]},
+{"name":"VAL","nums":[2,13,23,27,36,42]},
+{"name":"GG","nums":[8,11,20,28,30,49]},
+{"name":"RHEBZ","nums":[2,4,21,23,25,29]},
+{"name":"RENZ","nums":[4,12,15,19,38,40]},
+{"name":"JEN","nums":[5,28,19,24,25,46]},
+{"name":"RICHARD","nums":[4,9,10,17,40,43]}
+    ];
+
+    // load drawResults from localStorage or initialize
+    let drawResults = JSON.parse(localStorage.getItem('drawResults')) || [
+      { date: 'Nov 5, 2025', nums: [5, 16, 17, 30, 35, 46] }
+    ];
+
+    const tbody = document.querySelector('#lottoTable tbody');
+    const resultsList = document.getElementById('resultsList');
+
+    function updateTable() {
+      tbody.innerHTML = '';
+      players.forEach(player => {
+        const tr = document.createElement('tr');
+        const nameTd = document.createElement('td');
+        nameTd.textContent = player.name;
+        tr.appendChild(nameTd);
+
+        player.nums.forEach(num => {
+          const td = document.createElement('td');
+          td.textContent = num;
+          // highlight if number appears in any draw
+          if (drawResults.some(r => r.nums.includes(num))) td.classList.add('highlight');
+          tr.appendChild(td);
+        });
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    function updateResultsList() {
+      resultsList.innerHTML = '';
+      drawResults.forEach((r, i) => {
+        const li = document.createElement('li');
+        li.className = 'small';
+        li.textContent = `${r.date}: ${r.nums.join(', ')}`;
+
+        const editBtn = document.createElement('button'); editBtn.textContent = 'Edit'; editBtn.className='edit-btn';
+        editBtn.onclick = () => editResult(i);
+        const deleteBtn = document.createElement('button'); deleteBtn.textContent = 'Delete'; deleteBtn.className='delete-btn';
+        deleteBtn.onclick = () => deleteResult(i);
+
+        li.appendChild(document.createTextNode(' '));
+        li.appendChild(editBtn);
+        li.appendChild(deleteBtn);
+        resultsList.appendChild(li);
+      });
+    }
+
+    function saveDraws() {
+      localStorage.setItem('drawResults', JSON.stringify(drawResults));
+    }
+
+    function deleteResult(index) {
+      if (!confirm('Delete this result?')) return;
+      drawResults.splice(index,1);
+      saveDraws(); updateResultsList(); updateTable();
+    }
+
+    function editResult(index) {
+      const r = drawResults[index];
+      document.getElementById('drawDate').value = r.date;
+      document.getElementById('drawNumbers').value = r.nums.join(', ');
+      drawResults.splice(index,1); saveDraws(); updateResultsList(); updateTable();
+    }
+
+    document.getElementById('addResultForm').addEventListener('submit', e => {
+      e.preventDefault();
+      const date = document.getElementById('drawDate').value.trim();
+      const nums = document.getElementById('drawNumbers').value.split(',').map(n=>parseInt(n.trim())).filter(n=>!isNaN(n));
+      if (!date || nums.length!==6) { alert('Enter a valid date and exactly 6 numbers.'); return; }
+      drawResults.push({date, nums}); saveDraws(); updateResultsList(); updateTable(); e.target.reset();
+    });
+
+    // export/import helpers
+    document.getElementById('exportBtn').onclick = () => {
+      const data = JSON.stringify(drawResults, null, 2);
+      const blob = new Blob([data], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'drawResults.json'; a.click(); URL.revokeObjectURL(url);
+    }
+    document.getElementById('importBtn').onclick = () => { document.getElementById('importArea').style.display = document.getElementById('importArea').style.display==='none'?'block':'none'; }
+    document.getElementById('doImport').onclick = ()=>{
+      try{
+        const imported = JSON.parse(document.getElementById('importJson').value);
+        if (!Array.isArray(imported)) throw new Error('Invalid format');
+        drawResults = imported; saveDraws(); updateResultsList(); updateTable(); document.getElementById('importArea').style.display='none';
+      }catch(err){ alert('Invalid JSON: '+err.message); }
+    }
+
+    // initial render
+    updateResultsList(); updateTable();
+
+    // expose for debugging
+    window.__LOTTO = { players, drawResults };
+  </script>
+</body>
+</html>
