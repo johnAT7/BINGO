@@ -5,43 +5,51 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>6/49 Lotto Tracker</title>
   <style>
-    body { font-family: Arial, sans-serif; background: #f4f4f4; color: #333; padding: 20px; }
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(to bottom, #c81d25, #006400);
+      background-attachment: fixed;
+      color: #fff;
+      padding: 20px;
+      text-shadow: 1px 1px 3px rgba(0,0,0,0.4);
+    }
     .container { max-width: 1200px; margin: 0 auto; }
-    table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 14px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 14px; background: rgba(255,255,255,0.9); color: #222; border-radius: 10px; overflow: hidden; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background: #222; color: #fff; }
+    th { background: #006400; color: #fff; }
     tr:nth-child(even) { background: #f9f9f9; }
-    .highlight { background: #ffec8b; font-weight: 700; }
-    .note { color:#666; font-size:13px }
-    .top-row { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap }
+    .highlight { background: #ffec8b; font-weight: 700; color: #c81d25; }
+    h1 { text-align: center; font-size: 2.5em; margin-top: 0; }
+    .note { text-align: center; font-size: 1.1em; margin-bottom: 10px; }
+    #fireworksCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+    .results { margin-top: 30px; text-align: center; }
+    ul { list-style: none; padding: 0; }
+    li { background: rgba(255,255,255,0.2); padding: 8px; margin: 5px auto; width: fit-content; border-radius: 6px; }
   </style>
 </head>
 <body>
+  <canvas id="fireworksCanvas"></canvas>
   <div class="container">
-    <div class="top-row">
-      <h1>6/49 Lotto Tracker</h1>
-      <div class="note">BINGO</div>
-    </div>
-
-    <p class="note">Official draw results are shown below — matching numbers are highlighted across all players.</p>
+    <h1>🎄 BINGO 🎁</h1>
+    <p class="note"> </p>
 
     <table id="lottoTable">
       <thead>
         <tr>
           <th>Name</th>
-          <th>1</th>
-          <th>2</th>
-          <th>3</th>
-          <th>4</th>
-          <th>5</th>
-          <th>6</th>
+          <th>#1</th>
+          <th>#2</th>
+          <th>#3</th>
+          <th>#4</th>
+          <th>#5</th>
+          <th>#6</th>
         </tr>
       </thead>
       <tbody></tbody>
     </table>
 
     <div class="results">
-      <h2>Official 6/49 Draw Results</h2>
+      <h2>✨ Official 6/49 Draw Results ✨</h2>
       <ul id="resultsList"></ul>
     </div>
   </div>
@@ -111,14 +119,67 @@
 {"name":"RICHARD","nums":[4,9,10,17,40,43]}
     ];
 
-    // Static draw results (editable only in code)
-    const drawResults = [
-      { date: 'Nov 5, 2025', nums: [5, 16, 17, 30, 35, 46] },
-      { date: 'Nov 8, 2025', nums: [12, 15, 16, 21, 29, 47] }
-    ];
-
+    let drawResults = [];
     const tbody = document.querySelector('#lottoTable tbody');
     const resultsList = document.getElementById('resultsList');
+
+async function fetchMagayoResults() {
+  try {
+    // CORS-friendly text proxy of the page
+    const url = 'https://r.jina.ai/http://www.magayo.com/lotto/canada/lotto-649-results/';
+    const res = await fetch(url, { cache: 'no-store' });
+    const text = await res.text();
+
+    // Match blocks like: "8 November 2025 ... 09 17 21 39 41 48 Bonus 28"
+    const monthRe = '(?:Nov(?:ember)?|Dec(?:ember)?)';
+    const blockRe = new RegExp(
+      `(\\d{1,2})\\s+${monthRe}\\s+2025[\\s\\S]*?(\\d{1,2}\\s+\\d{1,2}\\s+\\d{1,2}\\s+\\d{1,2}\\s+\\d{1,2}\\s+\\d{1,2})\\s+Bonus`,
+      'gi'
+    );
+    const lineRe = new RegExp(`(\\d{1,2})\\s+(${monthRe})\\s+2025`, 'i');
+
+    const resultsByDate = new Map();
+    const START = new Date('2025-11-05T00:00:00');
+
+    function toDateObj(day, monthWord) {
+      const m = monthWord.toLowerCase().startsWith('nov') ? 10 : 11; // 0-based: Nov=10, Dec=11
+      return new Date(2025, m, parseInt(day, 10));
+    }
+
+    const matches = [...text.matchAll(blockRe)];
+    for (const mt of matches) {
+      // Re-find the month word around where the match occurred
+      const around = text.slice(Math.max(0, mt.index - 60), Math.min(text.length, mt.index + 60));
+      const lm = around.match(lineRe);
+      if (!lm) continue;
+
+      const day = lm[1];
+      const monthWord = lm[2];
+      const dateObj = toDateObj(day, monthWord);
+      if (!(dateObj instanceof Date) || isNaN(+dateObj) || dateObj < START) continue;
+
+      const nums = mt[2].trim().split(/\s+/).map(n => parseInt(n, 10));
+      if (nums.length !== 6 || nums.some(n => isNaN(n))) continue;
+
+      const dateStr = `${day} ${monthWord} 2025`;
+      resultsByDate.set(dateStr, nums);
+    }
+
+    // Build newest-first array
+    drawResults = Array.from(resultsByDate.entries())
+      .map(([date, nums]) => ({ date, nums }))
+      .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    updateResultsList();
+    updateTable();
+  } catch (err) {
+    console.error('Error fetching results:', err);
+    const li = document.createElement('li');
+    li.textContent = 'Unable to auto-fetch results right now.';
+    resultsList.appendChild(li);
+  }
+}
+
 
     function updateTable() {
       tbody.innerHTML = '';
@@ -148,8 +209,76 @@
       });
     }
 
-    updateResultsList();
-    updateTable();
+    const canvas = document.getElementById('fireworksCanvas');
+    const ctx = canvas.getContext('2d');
+    let fireworks = [];
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    class Firework {
+      constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = canvas.height;
+        this.targetY = Math.random() * canvas.height / 2;
+        this.color = `hsl(${Math.random() * 360}, 100%, 60%)`;
+        this.speed = 2 + Math.random() * 3;
+      }
+      update() {
+        this.y -= this.speed;
+        if (this.y < this.targetY) this.explode();
+      }
+      explode() {
+        for (let i = 0; i < 30; i++) fireworks.push(new Particle(this.x, this.y, this.color));
+        this.dead = true;
+      }
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+      }
+    }
+
+    class Particle {
+      constructor(x, y, color) {
+        this.x = x;
+        this.y = y;
+        this.color = color;
+        this.speedX = (Math.random() - 0.5) * 6;
+        this.speedY = (Math.random() - 0.5) * 6;
+        this.life = 100;
+      }
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        this.life--;
+      }
+      draw() {
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
+        ctx.fillStyle = this.color;
+        ctx.fill();
+      }
+    }
+
+    function animateFireworks() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (Math.random() < 0.05) fireworks.push(new Firework());
+      fireworks.forEach((f, i) => {
+        f.update(); f.draw();
+        if (f.dead) fireworks.splice(i, 1);
+      });
+      requestAnimationFrame(animateFireworks);
+    }
+
+    animateFireworks();
+    fetchMagayoResults();
   </script>
 </body>
 </html>
