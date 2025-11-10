@@ -125,47 +125,51 @@
 
 async function fetchMagayoResults() {
   try {
-    // CORS-friendly text proxy of the page
-    const url = 'https://r.jina.ai/http://www.magayo.com/lotto/canada/lotto-649-results/';
-    const res = await fetch(url, { cache: 'no-store' });
+    const res = await fetch(
+      "https://r.jina.ai/http://www.lotto-8.com/canada/listltoCA649.asp",
+      { cache: "no-store" }
+    );
     const text = await res.text();
 
-    // Match blocks like: "8 November 2025 ... 09 17 21 39 41 48 Bonus 28"
-    const monthRe = '(?:Nov(?:ember)?|Dec(?:ember)?)';
-    const blockRe = new RegExp(
-      `(\\d{1,2})\\s+${monthRe}\\s+2025[\\s\\S]*?(\\d{1,2}\\s+\\d{1,2}\\s+\\d{1,2}\\s+\\d{1,2}\\s+\\d{1,2}\\s+\\d{1,2})\\s+Bonus`,
-      'gi'
-    );
-    const lineRe = new RegExp(`(\\d{1,2})\\s+(${monthRe})\\s+2025`, 'i');
+    // Split into lines and pair date lines with the next numbers line.
+    const lines = text.split(/\r?\n/);
+
+    const dateLineRe = /^\s*(\d{2})\/(\d{2})\s*$/; // e.g., "05/11"
+    const numsLineRe = /^\s*25\([A-Z]{3}\)(\d{1,2}(?:,\d{1,2}){5})\s+\d{1,2}\s*$/; // "25(WED)05,16,17,30,35,46 06"
 
     const resultsByDate = new Map();
-    const START = new Date('2025-11-05T00:00:00');
+    const START = new Date("2025-11-05T00:00:00");
+    const monthNames = [
+      null,"January","February","March","April","May","June",
+      "July","August","September","October","November","December"
+    ];
 
-    function toDateObj(day, monthWord) {
-      const m = monthWord.toLowerCase().startsWith('nov') ? 10 : 11; // 0-based: Nov=10, Dec=11
-      return new Date(2025, m, parseInt(day, 10));
-    }
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(dateLineRe);
+      if (!m) continue;
 
-    const matches = [...text.matchAll(blockRe)];
-    for (const mt of matches) {
-      // Re-find the month word around where the match occurred
-      const around = text.slice(Math.max(0, mt.index - 60), Math.min(text.length, mt.index + 60));
-      const lm = around.match(lineRe);
-      if (!lm) continue;
+      const dd = parseInt(m[1], 10);
+      const mm = parseInt(m[2], 10);
 
-      const day = lm[1];
-      const monthWord = lm[2];
-      const dateObj = toDateObj(day, monthWord);
-      if (!(dateObj instanceof Date) || isNaN(+dateObj) || dateObj < START) continue;
+      // find next non-empty line for the numbers
+      let j = i + 1;
+      while (j < lines.length && lines[j].trim() === "") j++;
 
-      const nums = mt[2].trim().split(/\s+/).map(n => parseInt(n, 10));
-      if (nums.length !== 6 || nums.some(n => isNaN(n))) continue;
+      if (j >= lines.length) continue;
+      const n = lines[j].match(numsLineRe);
+      if (!n) continue;
 
-      const dateStr = `${day} ${monthWord} 2025`;
+      const dateObj = new Date(2025, mm - 1, dd); // DD/MM/25 → 2025-mm-dd
+      if (isNaN(+dateObj) || dateObj < START) continue;
+
+      const nums = n[1].split(",").map(x => parseInt(x.trim(), 10));
+      if (nums.length !== 6 || nums.some(Number.isNaN)) continue;
+
+      const dateStr = `${dd} ${monthNames[mm]} 2025`;
       resultsByDate.set(dateStr, nums);
     }
 
-    // Build newest-first array
+    // newest first
     drawResults = Array.from(resultsByDate.entries())
       .map(([date, nums]) => ({ date, nums }))
       .sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -173,13 +177,12 @@ async function fetchMagayoResults() {
     updateResultsList();
     updateTable();
   } catch (err) {
-    console.error('Error fetching results:', err);
-    const li = document.createElement('li');
-    li.textContent = 'Unable to auto-fetch results right now.';
+    console.error("Error fetching results:", err);
+    const li = document.createElement("li");
+    li.textContent = "Unable to fetch results automatically.";
     resultsList.appendChild(li);
   }
 }
-
 
     function updateTable() {
       tbody.innerHTML = '';
