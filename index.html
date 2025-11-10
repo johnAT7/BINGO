@@ -12,14 +12,6 @@
     th { background: #222; color: #fff; }
     tr:nth-child(even) { background: #f9f9f9; }
     .highlight { background: #ffec8b; font-weight: 700; }
-    .results { margin-top: 20px; }
-    .results h2 { margin-bottom: 10px; }
-    input[type="text"] { padding: 6px; width: 260px; }
-    button { padding: 6px 12px; margin: 5px; cursor: pointer; border-radius: 4px; border: none; }
-    .edit-btn { background: #007bff; color: white; }
-    .delete-btn { background: #dc3545; color: white; }
-    .small { font-size: 13px; }
-    .flex { display:flex; gap:10px; align-items:center; flex-wrap:wrap }
     .note { color:#666; font-size:13px }
     .top-row { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap }
   </style>
@@ -31,24 +23,7 @@
       <div class="note">BINGO</div>
     </div>
 
-    <p class="note">Enter official draw results below — matches will be highlighted across all players. You can edit or delete draws. Refreshing the page keeps your draw history.</p>
-
-    <div class="results">
-      <h2>Manage Draw Results</h2>
-      <form id="addResultForm" class="flex">
-        <label class="small">Date:</label>
-        <input type="text" id="drawDate" placeholder="e.g., Nov 13, 2025" required />
-        <label class="small">Numbers:</label>
-        <input type="text" id="drawNumbers" placeholder="e.g., 5, 12, 22, 29, 34, 41" required />
-        <button type="submit">Save Result</button>
-        <button type="button" id="exportBtn">Export JSON</button>
-        <button type="button" id="importBtn">Import JSON</button>
-      </form>
-      <div id="importArea" style="margin-top:10px;display:none">
-        <textarea id="importJson" rows="4" style="width:100%" placeholder='Paste drawResults JSON here and click "Import"'></textarea>
-        <div style="text-align:right;"><button id="doImport">Import</button></div>
-      </div>
-    </div>
+    <p class="note">Official draw results are shown below — matching numbers are highlighted across all players.</p>
 
     <table id="lottoTable">
       <thead>
@@ -72,7 +47,6 @@
   </div>
 
   <script>
-    // Full players list (from your input) — duplicates preserved
     const players = [
 {"name":"JOEL","nums":[5,7,11,22,44,47]},
 {"name":"RAUL","nums":[4,9,11,34,38,44]},
@@ -137,9 +111,10 @@
 {"name":"RICHARD","nums":[4,9,10,17,40,43]}
     ];
 
-    // load drawResults from localStorage or initialize
-    let drawResults = JSON.parse(localStorage.getItem('drawResults')) || [
-      { date: 'Nov 5, 2025', nums: [5, 16, 17, 30, 35, 46] },{date: 'Nov 8,2025',nums:[12, 15, 16, 21, 29, 47]}
+    // Static draw results (editable only in code)
+    const drawResults = [
+      { date: 'Nov 5, 2025', nums: [5, 16, 17, 30, 35, 46] },
+      { date: 'Nov 8, 2025', nums: [12, 15, 16, 21, 29, 47] }
     ];
 
     const tbody = document.querySelector('#lottoTable tbody');
@@ -156,7 +131,6 @@
         player.nums.forEach(num => {
           const td = document.createElement('td');
           td.textContent = num;
-          // highlight if number appears in any draw
           if (drawResults.some(r => r.nums.includes(num))) td.classList.add('highlight');
           tr.appendChild(td);
         });
@@ -167,69 +141,15 @@
 
     function updateResultsList() {
       resultsList.innerHTML = '';
-      drawResults.forEach((r, i) => {
+      drawResults.forEach(r => {
         const li = document.createElement('li');
-        li.className = 'small';
         li.textContent = `${r.date}: ${r.nums.join(', ')}`;
-
-        const editBtn = document.createElement('button'); editBtn.textContent = 'Edit'; editBtn.className='edit-btn';
-        editBtn.onclick = () => editResult(i);
-        const deleteBtn = document.createElement('button'); deleteBtn.textContent = 'Delete'; deleteBtn.className='delete-btn';
-        deleteBtn.onclick = () => deleteResult(i);
-
-        li.appendChild(document.createTextNode(' '));
-        li.appendChild(editBtn);
-        li.appendChild(deleteBtn);
         resultsList.appendChild(li);
       });
     }
 
-    function saveDraws() {
-      localStorage.setItem('drawResults', JSON.stringify(drawResults));
-    }
-
-    function deleteResult(index) {
-      if (!confirm('Delete this result?')) return;
-      drawResults.splice(index,1);
-      saveDraws(); updateResultsList(); updateTable();
-    }
-
-    function editResult(index) {
-      const r = drawResults[index];
-      document.getElementById('drawDate').value = r.date;
-      document.getElementById('drawNumbers').value = r.nums.join(', ');
-      drawResults.splice(index,1); saveDraws(); updateResultsList(); updateTable();
-    }
-
-    document.getElementById('addResultForm').addEventListener('submit', e => {
-      e.preventDefault();
-      const date = document.getElementById('drawDate').value.trim();
-      const nums = document.getElementById('drawNumbers').value.split(',').map(n=>parseInt(n.trim())).filter(n=>!isNaN(n));
-      if (!date || nums.length!==6) { alert('Enter a valid date and exactly 6 numbers.'); return; }
-      drawResults.push({date, nums}); saveDraws(); updateResultsList(); updateTable(); e.target.reset();
-    });
-
-    // export/import helpers
-    document.getElementById('exportBtn').onclick = () => {
-      const data = JSON.stringify(drawResults, null, 2);
-      const blob = new Blob([data], {type:'application/json'});
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = 'drawResults.json'; a.click(); URL.revokeObjectURL(url);
-    }
-    document.getElementById('importBtn').onclick = () => { document.getElementById('importArea').style.display = document.getElementById('importArea').style.display==='none'?'block':'none'; }
-    document.getElementById('doImport').onclick = ()=>{
-      try{
-        const imported = JSON.parse(document.getElementById('importJson').value);
-        if (!Array.isArray(imported)) throw new Error('Invalid format');
-        drawResults = imported; saveDraws(); updateResultsList(); updateTable(); document.getElementById('importArea').style.display='none';
-      }catch(err){ alert('Invalid JSON: '+err.message); }
-    }
-
-    // initial render
-    updateResultsList(); updateTable();
-
-    // expose for debugging
-    window.__LOTTO = { players, drawResults };
+    updateResultsList();
+    updateTable();
   </script>
 </body>
 </html>
