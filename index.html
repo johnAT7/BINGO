@@ -16,14 +16,14 @@
     .container { max-width: 1200px; margin: 0 auto; }
     table { border-collapse: collapse; width: 100%; margin-top: 20px; font-size: 14px; background: rgba(255,255,255,0.9); color: #222; border-radius: 10px; overflow: hidden; }
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-    th { background: #006400; color: #fff; }
+    th { background: #006400; color: #fff; position: sticky; top: 0; z-index: 5; }
     tr:nth-child(even) { background: #f9f9f9; }
     .highlight { background: #ffec8b; font-weight: 700; color: #c81d25; }
     h1 { text-align: center; font-size: 2.5em; margin-top: 0; }
     .note { text-align: center; font-size: 1.1em; margin-bottom: 10px; }
     #fireworksCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-    .results { margin-top: 30px; text-align: center; }
-    ul { list-style: none; padding: 0; }
+    .results { margin-bottom: 20px; text-align: center; position: sticky; top: 0; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 10px; z-index: 6; }
+    ul { list-style: none; padding: 0; margin: 0; }
     li { background: rgba(255,255,255,0.2); padding: 8px; margin: 5px auto; width: fit-content; border-radius: 6px; }
   </style>
 </head>
@@ -31,7 +31,10 @@
   <canvas id="fireworksCanvas"></canvas>
   <div class="container">
     <h1>🎄 BINGO 🎁</h1>
-    <p class="note"> </p>
+    <div class="results">
+      <h2>✨ Official 6/49 Draw Results ✨</h2>
+      <ul id="resultsList"></ul>
+    </div>
 
     <table id="lottoTable">
       <thead>
@@ -47,11 +50,6 @@
       </thead>
       <tbody></tbody>
     </table>
-
-    <div class="results">
-      <h2>✨ Official 6/49 Draw Results ✨</h2>
-      <ul id="resultsList"></ul>
-    </div>
   </div>
 
   <script>
@@ -117,72 +115,65 @@
 {"name":"RENZ","nums":[4,12,15,19,38,40]},
 {"name":"JEN","nums":[5,28,19,24,25,46]},
 {"name":"RICHARD","nums":[4,9,10,17,40,43]}
-    ];
+		];
 
     let drawResults = [];
     const tbody = document.querySelector('#lottoTable tbody');
     const resultsList = document.getElementById('resultsList');
 
-async function fetchMagayoResults() {
-  try {
-    const res = await fetch(
-      "https://r.jina.ai/http://www.lotto-8.com/canada/listltoCA649.asp",
-      { cache: "no-store" }
-    );
-    const text = await res.text();
+    async function fetchMagayoResults() {
+      try {
+        const res = await fetch(
+          "https://r.jina.ai/http://www.lotto-8.com/canada/listltoCA649.asp",
+          { cache: "no-store" }
+        );
+        const text = await res.text();
 
-    // Split into lines and pair date lines with the next numbers line.
-    const lines = text.split(/\r?\n/);
+        const lines = text.split(/\r?\n/);
+        const dateLineRe = /^\s*(\d{2})\/(\d{2})\s*$/;
+        const numsLineRe = /^\s*25\([A-Z]{3}\)(\d{1,2}(?:,\d{1,2}){5})\s+\d{1,2}\s*$/;
 
-    const dateLineRe = /^\s*(\d{2})\/(\d{2})\s*$/; // e.g., "05/11"
-    const numsLineRe = /^\s*25\([A-Z]{3}\)(\d{1,2}(?:,\d{1,2}){5})\s+\d{1,2}\s*$/; // "25(WED)05,16,17,30,35,46 06"
+        const resultsByDate = new Map();
+        const START = new Date("2025-11-05T00:00:00");
+        const monthNames = [null, "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-    const resultsByDate = new Map();
-    const START = new Date("2025-11-05T00:00:00");
-    const monthNames = [
-      null,"January","February","March","April","May","June",
-      "July","August","September","October","November","December"
-    ];
+        for (let i = 0; i < lines.length; i++) {
+          const m = lines[i].match(dateLineRe);
+          if (!m) continue;
 
-    for (let i = 0; i < lines.length; i++) {
-      const m = lines[i].match(dateLineRe);
-      if (!m) continue;
+          const dd = parseInt(m[1], 10);
+          const mm = parseInt(m[2], 10);
 
-      const dd = parseInt(m[1], 10);
-      const mm = parseInt(m[2], 10);
+          let j = i + 1;
+          while (j < lines.length && lines[j].trim() === "") j++;
 
-      // find next non-empty line for the numbers
-      let j = i + 1;
-      while (j < lines.length && lines[j].trim() === "") j++;
+          if (j >= lines.length) continue;
+          const n = lines[j].match(numsLineRe);
+          if (!n) continue;
 
-      if (j >= lines.length) continue;
-      const n = lines[j].match(numsLineRe);
-      if (!n) continue;
+          const dateObj = new Date(2025, mm - 1, dd);
+          if (isNaN(+dateObj) || dateObj < START) continue;
 
-      const dateObj = new Date(2025, mm - 1, dd); // DD/MM/25 → 2025-mm-dd
-      if (isNaN(+dateObj) || dateObj < START) continue;
+          const nums = n[1].split(",").map(x => parseInt(x.trim(), 10));
+          if (nums.length !== 6 || nums.some(Number.isNaN)) continue;
 
-      const nums = n[1].split(",").map(x => parseInt(x.trim(), 10));
-      if (nums.length !== 6 || nums.some(Number.isNaN)) continue;
+          const dateStr = `${dd} ${monthNames[mm]} 2025`;
+          resultsByDate.set(dateStr, nums);
+        }
 
-      const dateStr = `${dd} ${monthNames[mm]} 2025`;
-      resultsByDate.set(dateStr, nums);
+        drawResults = Array.from(resultsByDate.entries())
+          .map(([date, nums]) => ({ date, nums }))
+          .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        updateResultsList();
+        updateTable();
+      } catch (err) {
+        console.error("Error fetching results:", err);
+        const li = document.createElement("li");
+        li.textContent = "Unable to fetch results automatically.";
+        resultsList.appendChild(li);
+      }
     }
-
-    // newest first
-    drawResults = Array.from(resultsByDate.entries())
-      .map(([date, nums]) => ({ date, nums }))
-      .sort((a, b) => new Date(b.date) - new Date(a.date));
-
-    updateResultsList();
-    updateTable();
-  } catch (err) {
-    console.error("Error fetching results:", err);
-    const li = document.createElement("li");
-    li.textContent = "Unable to fetch results automatically.";
-    resultsList.appendChild(li);
-  }
-}
 
     function updateTable() {
       tbody.innerHTML = '';
